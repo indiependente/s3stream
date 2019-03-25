@@ -1,3 +1,4 @@
+[![Go Report Card](https://goreportcard.com/badge/github.com/indiependente/s3stream)](https://goreportcard.com/report/github.com/indiependente/s3stream)
 # s3stream
 **Streaming client for Amazon AWS S3**
 
