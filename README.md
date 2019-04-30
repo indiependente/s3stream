@@ -1,9 +1,19 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/indiependente/s3stream)](https://goreportcard.com/report/github.com/indiependente/s3stream)
 [![GoDoc](https://godoc.org/github.com/indiependente/s3stream?status.svg)](https://godoc.org/github.com/indiependente/s3stream)
 # s3stream
+
+## What is it?
 **Streaming client for Amazon AWS S3**
 
 Golang library that allows Get and Put operations from/to Amazon S3 in streaming fashion.
+
+## How to install
+
+```
+go get github.com/indiependente/s3stream
+```
+
+## Usage
 
 Get:
 ```go
