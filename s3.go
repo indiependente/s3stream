@@ -114,12 +114,11 @@ func (s Store) getDataInRange(prefix, bucketname, filename, rangeSpecifier strin
 
 // Put stores the content of the reader in input with the specified name.
 // Returns number of bytes written and an error if any.
-func (s Store) Put(prefix, bucketname, filename string, contentType string, r io.Reader) (int, error) {
+func (s Store) Put(prefix, bucketname, filename string, r io.Reader) (int, error) {
 	// initialize upload
 	input := &s3.CreateMultipartUploadInput{
-		Bucket:      aws.String(bucketname),
-		Key:         aws.String(prefix + filename),
-		ContentType: aws.String(contentType),
+		Bucket: aws.String(bucketname),
+		Key:    aws.String(prefix + filename),
 	}
 	resp, err := s.api.CreateMultipartUpload(input)
 	if err != nil {

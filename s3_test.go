@@ -20,10 +20,9 @@ import (
 func TestStore_Get(t *testing.T) {
 
 	type args struct {
-		prefix      string
-		bucketname  string
-		filename    string
-		contentType string
+		prefix     string
+		bucketname string
+		filename   string
 	}
 
 	conf := &aws.Config{
@@ -49,10 +48,9 @@ func TestStore_Get(t *testing.T) {
 			name:     "test streaming - 2MB",
 			testdata: "data/Photo by NASA (yZygONrUBe8).jpg",
 			args: args{
-				prefix:      "",
-				bucketname:  "tiny",
-				filename:    "Photo by NASA (yZygONrUBe8).jpg",
-				contentType: "image/jpeg",
+				prefix:     "",
+				bucketname: "tiny",
+				filename:   "Photo by NASA (yZygONrUBe8).jpg",
 			},
 			conf:           conf,
 			expectedSha256: "fa63b10d8592bf468203c554419cb07a281790c45265fdd8761e171ee77e5dae",
@@ -62,10 +60,9 @@ func TestStore_Get(t *testing.T) {
 			name:     "test streaming - 16MB",
 			testdata: "data/RC_2006-05.json",
 			args: args{
-				prefix:      "",
-				bucketname:  "small",
-				filename:    "RC_2006-05.json",
-				contentType: "application/json",
+				prefix:     "",
+				bucketname: "small",
+				filename:   "RC_2006-05.json",
 			},
 			conf:           conf,
 			expectedSha256: "b0fa845e08d9228a8109018f70676744e36c3e02834b4849bc2721310111a656",
@@ -75,10 +72,9 @@ func TestStore_Get(t *testing.T) {
 			name:     "test streaming - 45MB",
 			testdata: "data/reviews.json.gz",
 			args: args{
-				prefix:      "",
-				bucketname:  "big",
-				filename:    "reviews.json.gz",
-				contentType: "application/gzip",
+				prefix:     "",
+				bucketname: "big",
+				filename:   "reviews.json.gz",
 			},
 			conf:           conf,
 			expectedSha256: "b87037787e9d5374ce72995a29ac192cde1573513c31abfd4ca7781d802b1e22",
@@ -99,7 +95,7 @@ func TestStore_Get(t *testing.T) {
 
 			tt.r = fileReader(t, tt.testdata)
 			defer tt.r.Close()
-			_, err = store.Put(tt.args.prefix, tt.args.bucketname, tt.args.filename, tt.args.contentType, tt.r)
+			_, err = store.Put(tt.args.prefix, tt.args.bucketname, tt.args.filename, tt.r)
 			if err != nil {
 				t.Errorf("Store.Put() error = %v, wantErr %v", err, tt.wantErr)
 				return
