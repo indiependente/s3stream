@@ -25,7 +25,7 @@ rc, err := store.Get(prefix, bucketname, filename)
 Put:
 
 ```go
-n, err := store.Put(prefix, bucketname, filename, contentType, r)
+n, err := store.Put(prefix, bucketname, filename, r)
 ```
 
 `r` is an `io.Reader` and Put will stream its content to the specified file in the desired bucket.
