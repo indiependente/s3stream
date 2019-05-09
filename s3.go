@@ -8,6 +8,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -24,7 +25,7 @@ const (
 
 // Store is the S3 implementation of the Store interface.
 type Store struct {
-	api *s3.S3
+	api s3iface.S3API
 }
 
 // NewStore returns a Store given the input options.
@@ -38,7 +39,7 @@ func NewStore(conf *aws.Config) Store {
 }
 
 // NewStoreWithClient returns a Store given the input client.
-func NewStoreWithClient(client *s3.S3) Store {
+func NewStoreWithClient(client s3iface.S3API) Store {
 	return Store{
 		api: client,
 	}
