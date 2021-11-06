@@ -25,21 +25,32 @@ const (
 
 // Store is the S3 implementation of the Store interface.
 type Store struct {
-	api *s3.Client
+	api          *s3.Client
+	readPartSize int64
 }
 
 // NewStore returns a Store given the input options.
-func NewStore(conf aws.Config) Store {
+func NewStore(conf aws.Config, opts ...func(*Store)) Store {
 	api := s3.NewFromConfig(conf)
-	return Store{
-		api: api,
-	}
+	return NewStoreWithClient(api, opts...)
 }
 
 // NewStoreWithClient returns a Store given the input client.
-func NewStoreWithClient(client *s3.Client) Store {
-	return Store{
-		api: client,
+func NewStoreWithClient(client *s3.Client, opts ...func(*Store)) Store {
+	s := Store{
+		api:          client,
+		readPartSize: readBlockSize,
+	}
+	for _, o := range opts {
+		o(&s)
+	}
+	return s
+}
+
+// WithReadPartSize allows to set the part size of the multipart get operation.
+func WithReadPartSize(size int64) func(s *Store) {
+	return func(s *Store) {
+		s.readPartSize = size
 	}
 }
 
@@ -63,9 +74,9 @@ func (s Store) Get(ctx context.Context, prefix, bucketname, filename string) (io
 			rangeSpecifier      string
 		)
 
-		for i = 0; i < length/readBlockSize; i++ {
-			start = i * readBlockSize
-			rangeSpecifier = fmt.Sprintf("bytes=%d-%d", start, start+readBlockSize-1)
+		for i = 0; i < length/s.readPartSize; i++ {
+			start = i * s.readPartSize
+			rangeSpecifier = fmt.Sprintf("bytes=%d-%d", start, start+s.readPartSize-1)
 			data, err := s.getDataInRange(ctx, prefix, bucketname, filename, rangeSpecifier)
 			if err != nil {
 				pw.CloseWithError(fmt.Errorf("could not get data: %w", err)) // nolint: errcheck, gosec
@@ -76,9 +87,9 @@ func (s Store) Get(ctx context.Context, prefix, bucketname, filename string) (io
 			}
 
 		}
-		remainder = length % readBlockSize
+		remainder = length % s.readPartSize
 		if remainder > 0 {
-			start = (length / readBlockSize) * readBlockSize
+			start = (length / s.readPartSize) * s.readPartSize
 			rangeSpecifier = fmt.Sprintf("bytes=%d-%d", start, start+remainder-1)
 			data, err := s.getDataInRange(ctx, prefix, bucketname, filename, rangeSpecifier)
 			if err != nil {
