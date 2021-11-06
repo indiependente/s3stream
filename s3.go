@@ -30,27 +30,36 @@ type Store struct {
 }
 
 // NewStore returns a Store given the input options.
-func NewStore(conf aws.Config, opts ...func(*Store)) Store {
+func NewStore(conf aws.Config, opts ...func(*Store) error) (Store, error) {
 	api := s3.NewFromConfig(conf)
 	return NewStoreWithClient(api, opts...)
 }
 
 // NewStoreWithClient returns a Store given the input client.
-func NewStoreWithClient(client *s3.Client, opts ...func(*Store)) Store {
+func NewStoreWithClient(client *s3.Client, opts ...func(*Store) error) (Store, error) {
 	s := Store{
 		api:          client,
 		readPartSize: readBlockSize,
 	}
 	for _, o := range opts {
-		o(&s)
+		err := o(&s)
+		if err != nil {
+			return Store{}, err
+		}
 	}
-	return s
+	return s, nil
 }
 
 // WithReadPartSize allows to set the part size of the multipart get operation.
-func WithReadPartSize(size int64) func(s *Store) {
-	return func(s *Store) {
+// The part size cannot be greater than the AWS MaxPartSize constant of 5GB.
+// https://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
+func WithReadPartSize(size int64) func(s *Store) error {
+	return func(s *Store) error {
+		if size > awsMaxPartSize {
+			return errors.New("part size is over AWS limits")
+		}
 		s.readPartSize = size
+		return nil
 	}
 }
 

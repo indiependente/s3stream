@@ -101,8 +101,12 @@ func TestStore_Get(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := context.Background()
-			store := s3stream.NewStoreWithClient(svc)
-			err := initBucket(ctx, svc, tt.args.bucketname)
+			store, err := s3stream.NewStoreWithClient(svc)
+			if err != nil {
+				t.Errorf("Could not create store, error = %v", err)
+				return
+			}
+			err = initBucket(ctx, svc, tt.args.bucketname)
 			if err != nil {
 				t.Errorf("Could not create bucket, error = %v", err)
 				return
