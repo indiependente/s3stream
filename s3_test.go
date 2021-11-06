@@ -1,20 +1,21 @@
 package s3stream_test
 
 import (
+	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"testing"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
-	"github.com/indiependente/s3stream"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/indiependente/s3stream/v3"
 )
 
 func TestStore_Get(t *testing.T) {
@@ -24,29 +25,45 @@ func TestStore_Get(t *testing.T) {
 		bucketname string
 		filename   string
 	}
-
-	conf := &aws.Config{
-		Credentials:      credentials.NewStaticCredentials("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
-		Endpoint:         aws.String("http://localhost:9000"),
-		Region:           aws.String("us-west-2"),
-		DisableSSL:       aws.Bool(true),
-		S3ForcePathStyle: aws.Bool(true),
+	tr := &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+	client := &http.Client{Transport: tr}
+	conf := aws.Config{
+		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
+		Region:      "us-west-2",
+		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+			if service == s3.ServiceID && region == "us-west-2" {
+				return aws.Endpoint{
+					PartitionID:   "aws",
+					URL:           "http://localhost:9000",
+					SigningRegion: "us-west-2",
+				}, nil
+			}
+			// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
+			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		}),
+		HTTPClient: client,
 	}
 
-	svc := s3.New(session.Must(session.NewSession(conf)))
+	svc := s3.NewFromConfig(conf,
+		func(o *s3.Options) {
+			o.UsePathStyle = true
+		},
+	)
 
 	tests := []struct {
 		name           string
 		testdata       string
 		args           args
-		conf           *aws.Config
+		conf           aws.Config
 		r              io.ReadCloser
 		expectedSha256 string
 		wantErr        bool
 	}{
 		{
 			name:     "test streaming - 2MB",
-			testdata: "data/Photo by NASA (yZygONrUBe8).jpg",
+			testdata: "./data/Photo by NASA (yZygONrUBe8).jpg",
 			args: args{
 				prefix:     "",
 				bucketname: "tiny",
@@ -58,7 +75,7 @@ func TestStore_Get(t *testing.T) {
 		},
 		{
 			name:     "test streaming - 16MB",
-			testdata: "data/RC_2006-05.json",
+			testdata: "./data/RC_2006-05.json",
 			args: args{
 				prefix:     "",
 				bucketname: "small",
@@ -70,7 +87,7 @@ func TestStore_Get(t *testing.T) {
 		},
 		{
 			name:     "test streaming - 45MB",
-			testdata: "data/reviews.json.gz",
+			testdata: "./data/reviews.json.gz",
 			args: args{
 				prefix:     "",
 				bucketname: "big",
@@ -83,25 +100,26 @@ func TestStore_Get(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
 			store := s3stream.NewStoreWithClient(svc)
-			err := initBucket(svc, tt.args.bucketname)
+			err := initBucket(ctx, svc, tt.args.bucketname)
 			if err != nil {
 				t.Errorf("Could not create bucket, error = %v", err)
 				return
 			}
-			defer teardown(t, svc, tt.args.bucketname, tt.args.filename)
+			defer teardown(t, ctx, svc, tt.args.bucketname, tt.args.filename)
 
-			listBuckets(svc)
+			listBuckets(ctx, svc)
 
 			tt.r = fileReader(t, tt.testdata)
 			defer tt.r.Close()
-			_, err = store.Put(tt.args.prefix, tt.args.bucketname, tt.args.filename, tt.r)
+			_, err = store.Put(ctx, tt.args.prefix, tt.args.bucketname, tt.args.filename, tt.r)
 			if err != nil {
 				t.Errorf("Store.Put() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 
-			rc, err := store.Get(tt.args.prefix, tt.args.bucketname, tt.args.filename)
+			rc, err := store.Get(ctx, tt.args.prefix, tt.args.bucketname, tt.args.filename)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Store.Get() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -115,27 +133,12 @@ func TestStore_Get(t *testing.T) {
 	}
 }
 
-func initBucket(svc *s3.S3, bucketname string) error {
+func initBucket(ctx context.Context, svc *s3.Client, bucketname string) error {
 	input := &s3.CreateBucketInput{
 		Bucket: aws.String(bucketname),
 	}
-
-	result, err := svc.CreateBucket(input)
+	result, err := svc.CreateBucket(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case s3.ErrCodeBucketAlreadyExists:
-				fmt.Println(s3.ErrCodeBucketAlreadyExists, aerr.Error())
-			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				fmt.Println(s3.ErrCodeBucketAlreadyOwnedByYou, aerr.Error())
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
 		return err
 	}
 	fmt.Println(result)
@@ -143,58 +146,40 @@ func initBucket(svc *s3.S3, bucketname string) error {
 	return nil
 }
 
-func listBuckets(svc *s3.S3) {
+func listBuckets(ctx context.Context, svc *s3.Client) {
 	input := &s3.ListBucketsInput{}
 
-	result, err := svc.ListBuckets(input)
+	result, err := svc.ListBuckets(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
+		fmt.Println(err.Error())
 		return
 	}
 
 	fmt.Println(result)
 }
 
-func teardown(t *testing.T, svc *s3.S3, bucketname, filename string) {
-	err := deleteFile(svc, bucketname, filename)
+func teardown(t *testing.T, ctx context.Context, svc *s3.Client, bucketname, filename string) {
+	err := deleteFile(ctx, svc, bucketname, filename)
 	if err != nil {
 		t.Errorf("Could not delete file, error = %v", err)
 		return
 	}
-	err = destroyBucket(svc, bucketname)
+	err = destroyBucket(ctx, svc, bucketname)
 	if err != nil {
 		t.Errorf("Could not delete bucket, error = %v", err)
 		return
 	}
 }
 
-func deleteFile(svc *s3.S3, bucketname, filename string) error {
+func deleteFile(ctx context.Context, svc *s3.Client, bucketname, filename string) error {
 	input := &s3.DeleteObjectInput{
 		Bucket: aws.String(bucketname),
 		Key:    aws.String(filename),
 	}
 
-	result, err := svc.DeleteObject(input)
+	result, err := svc.DeleteObject(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
+		fmt.Println(err.Error())
 		return err
 	}
 
@@ -202,23 +187,14 @@ func deleteFile(svc *s3.S3, bucketname, filename string) error {
 	return nil
 }
 
-func destroyBucket(svc *s3.S3, bucketname string) error {
+func destroyBucket(ctx context.Context, svc *s3.Client, bucketname string) error {
 	input := &s3.DeleteBucketInput{
 		Bucket: aws.String(bucketname),
 	}
 
-	result, err := svc.DeleteBucket(input)
+	result, err := svc.DeleteBucket(ctx, input)
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			default:
-				fmt.Println(aerr.Error())
-			}
-		} else {
-			// Print the error, cast err to awserr.Error to get the Code and
-			// Message from an error.
-			fmt.Println(err.Error())
-		}
+		fmt.Println(err.Error())
 		return err
 	}
 
