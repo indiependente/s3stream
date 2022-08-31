@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"fmt"
 	"io"
-	"io/ioutil"
 
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -105,7 +104,7 @@ func (s Store) getDataInRange(prefix, bucketname, filename, rangeSpecifier strin
 	if err != nil {
 		return nil, errors.Wrapf(err, "Could not get object %s", rangeSpecifier)
 	}
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, errors.Wrapf(err, "Could not read from resp.Body")
 	}
@@ -210,10 +209,7 @@ func (s Store) Put(prefix, bucketname, filename string, r io.Reader) (int, error
 // uploadPart uploads a single part and returns a CompletedPart object and an error if any.
 // It will retry five times if not able to upload.
 func (s Store) uploadPart(resp *s3.CreateMultipartUploadOutput, data []byte, partNumber int) (*s3.CompletedPart, error) {
-
-	var (
-		uploadResult *s3.UploadPartOutput
-	)
+	var uploadResult *s3.UploadPartOutput
 
 	partInput := &s3.UploadPartInput{
 		Body:          bytes.NewReader(data),
@@ -243,7 +239,6 @@ func (s Store) uploadPart(resp *s3.CreateMultipartUploadOutput, data []byte, par
 		ETag:       uploadResult.ETag,
 		PartNumber: aws.Int64(int64(partNumber)),
 	}, nil
-
 }
 
 // abortMultipartUpload aborts the multipart upload process
