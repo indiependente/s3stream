@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"testing"
@@ -19,7 +18,6 @@ import (
 )
 
 func TestStore_Get(t *testing.T) {
-
 	type args struct {
 		prefix     string
 		bucketname string
@@ -32,7 +30,7 @@ func TestStore_Get(t *testing.T) {
 	conf := aws.Config{
 		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
 		Region:      "us-west-2",
-		EndpointResolver: aws.EndpointResolverFunc(func(service, region string) (aws.Endpoint, error) {
+		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (aws.Endpoint, error) {
 			if service == s3.ServiceID && region == "us-west-2" {
 				return aws.Endpoint{
 					PartitionID:   "aws",
@@ -132,7 +130,6 @@ func TestStore_Get(t *testing.T) {
 				t.Error("Put / Get failed, checksum mismatch")
 				return
 			}
-
 		})
 	}
 }
@@ -218,7 +215,7 @@ func fileReader(t *testing.T, filename string) io.ReadCloser {
 }
 
 func checksum(t *testing.T, r io.Reader, expectedSha256 string) bool {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		t.Errorf("Could not calculate checksum, error = %v", err)
 		return false
