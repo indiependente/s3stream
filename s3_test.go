@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -18,7 +17,6 @@ import (
 )
 
 func TestStore_Get(t *testing.T) {
-
 	type args struct {
 		prefix     string
 		bucketname string
@@ -110,7 +108,6 @@ func TestStore_Get(t *testing.T) {
 				t.Error("Put / Get failed, checksum mismatch")
 				return
 			}
-
 		})
 	}
 }
@@ -238,7 +235,7 @@ func fileReader(t *testing.T, filename string) io.ReadCloser {
 }
 
 func checksum(t *testing.T, r io.Reader, expectedSha256 string) bool {
-	data, err := ioutil.ReadAll(r)
+	data, err := io.ReadAll(r)
 	if err != nil {
 		t.Errorf("Could not calculate checksum, error = %v", err)
 		return false
