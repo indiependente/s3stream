@@ -72,7 +72,11 @@ func (s Store) Get(ctx context.Context, prefix, bucketname, filename string) (io
 		return nil, fmt.Errorf("could not get metadata for object %s: %w", filename, err)
 	}
 
-	length := objOut.ContentLength
+	if objOut.ContentLength == nil {
+		return nil, errors.New("could not get content length")
+	}
+
+	length := *objOut.ContentLength
 	pr, pw := io.Pipe()
 	go func() {
 		defer pw.Close() // nolint: errcheck, gosec
@@ -233,9 +237,9 @@ func (s Store) uploadPart(ctx context.Context, resp *s3.CreateMultipartUploadOut
 		Body:          bytes.NewReader(data),
 		Bucket:        resp.Bucket,
 		Key:           resp.Key,
-		PartNumber:    int32(partNumber),
+		PartNumber:    aws.Int32(int32(partNumber)),
 		UploadId:      resp.UploadId,
-		ContentLength: int64(len(data)),
+		ContentLength: aws.Int64(int64(len(data))),
 	}
 
 	for tryNum := 1; tryNum <= maxUploadRetries; tryNum++ {
@@ -258,7 +262,7 @@ func (s Store) uploadPart(ctx context.Context, resp *s3.CreateMultipartUploadOut
 
 	return &types.CompletedPart{
 		ETag:       uploadResult.ETag,
-		PartNumber: int32(partNumber),
+		PartNumber: aws.Int32(int32(partNumber)),
 	}, nil
 }
 
