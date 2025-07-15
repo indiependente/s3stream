@@ -144,7 +144,7 @@ func (s Store) Put(ctx context.Context, prefix, bucketname, filename string, r i
 	}
 	resp, err := s.api.CreateMultipartUpload(ctx, input)
 	if err != nil {
-		return 0, fmt.Errorf("could not create multipart upload: %w.", err)
+		return 0, fmt.Errorf("could not create multipart upload: %w", err)
 	}
 
 	var (
@@ -211,7 +211,7 @@ func (s Store) Put(ctx context.Context, prefix, bucketname, filename string, r i
 
 	// check for which reason it got out of the loop
 	if i > awsMaxParts && !reachedEOF {
-		maxparterr := fmt.Errorf("could not upload whole content... MaxPartsNumber limit reached. Aborting: %w...", err)
+		maxparterr := fmt.Errorf("could not upload whole content... MaxPartsNumber limit reached. Aborting: %w", err)
 		aberr := s.abortMultipartUpload(ctx, resp)
 		if aberr != nil {
 			return total, fmt.Errorf("could not abort upload: %w", maxparterr)
