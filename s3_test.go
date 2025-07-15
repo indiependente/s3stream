@@ -28,20 +28,10 @@ func TestStore_Get(t *testing.T) {
 	}
 	client := &http.Client{Transport: tr}
 	conf := aws.Config{
-		Credentials: credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
-		Region:      "us-west-2",
-		EndpointResolverWithOptions: aws.EndpointResolverWithOptionsFunc(func(service, region string, _ ...interface{}) (aws.Endpoint, error) {
-			if service == s3.ServiceID && region == "us-west-2" {
-				return aws.Endpoint{
-					PartitionID:   "aws",
-					URL:           "http://localhost:9000",
-					SigningRegion: "us-west-2",
-				}, nil
-			}
-			// returning EndpointNotFoundError will allow the service to fallback to it's default resolution
-			return aws.Endpoint{}, &aws.EndpointNotFoundError{}
-		}),
-		HTTPClient: client,
+		Credentials:  credentials.NewStaticCredentialsProvider("AKIAIOSFODNN7EXAMPLE", "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY", ""),
+		Region:       "us-west-2",
+		BaseEndpoint: aws.String("http://localhost:9000"),
+		HTTPClient:   client,
 	}
 
 	svc := s3.NewFromConfig(conf,
@@ -114,7 +104,7 @@ func TestStore_Get(t *testing.T) {
 			listBuckets(ctx, svc)
 
 			tt.r = fileReader(t, tt.testdata)
-			defer tt.r.Close()
+			defer tt.r.Close() // nolint:errcheck
 			_, err = store.Put(ctx, tt.args.prefix, tt.args.bucketname, tt.args.filename, tt.r)
 			if err != nil {
 				t.Errorf("Store.Put() error = %v, wantErr %v", err, tt.wantErr)
