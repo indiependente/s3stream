@@ -26,6 +26,7 @@ const (
 type Store struct {
 	api          *s3.Client
 	readPartSize int64
+	putACL       *types.ObjectCannedACL
 }
 
 // NewStore returns a Store given the input options.
@@ -58,6 +59,15 @@ func WithReadPartSize(size int64) func(s *Store) error {
 			return errors.New("part size is over AWS limits")
 		}
 		s.readPartSize = size
+		return nil
+	}
+}
+
+// WithPutACL uses the provided canned ACL during Put operations.
+func WithPutACL(acl types.ObjectCannedACL) func(s *Store) error {
+	return func(s *Store) error {
+		s.putACL = &acl
+
 		return nil
 	}
 }
@@ -142,6 +152,11 @@ func (s Store) Put(ctx context.Context, prefix, bucketname, filename string, r i
 		Bucket: aws.String(bucketname),
 		Key:    aws.String(prefix + filename),
 	}
+
+	if s.putACL != nil {
+		input.ACL = *s.putACL
+	}
+
 	resp, err := s.api.CreateMultipartUpload(ctx, input)
 	if err != nil {
 		return 0, fmt.Errorf("could not create multipart upload: %w", err)
